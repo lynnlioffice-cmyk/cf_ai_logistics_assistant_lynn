@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clearance Follow-up Assistant</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: #f3f6fa; color: #172b40;
+      font: 16px/1.6 system-ui, sans-serif;
+    }
+    main { max-width: 880px; margin: 40px auto; padding: 20px; }
+    .label {
+      color: #3669af; font-size: 12px;
+      font-weight: 700; letter-spacing: 2px;
+    }
+    h1 { font-size: clamp(27px, 5vw, 38px); line-height: 1.2; }
+    .intro { color: #586b80; }
+    .notice {
+      padding: 14px 18px; background: #fff4da;
+      border-radius: 12px; font-size: 14px;
+    }
+    .toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; margin: 24px 0 14px; flex-wrap: wrap;
+    }
+    button {
+      border: 0; border-radius: 9px; padding: 11px 18px;
+      background: #245bc0; color: white; cursor: pointer;
+      font: inherit; font-weight: 600;
+    }
+    button.secondary { background: #e3eaf4; color: #23436b; }
+    button:disabled { opacity: .5; cursor: wait; }
+    #messages {
+      background: white; border: 1px solid #dce4ef;
+      border-radius: 16px; padding: 20px; min-height: 230px;
+    }
+    .message {
+      padding: 14px 16px; margin-bottom: 14px;
+      border-radius: 12px; background: #f0f4fa;
+      white-space: pre-wrap; overflow-wrap: anywhere;
+    }
+    .message.user { background: #e8f0ff; }
+    .speaker {
+      display: block; margin-bottom: 6px; font-size: 12px;
+      text-transform: uppercase; color: #416184;
+    }
+    label { display: block; font-weight: 600; margin-top: 20px; }
+    textarea {
+      width: 100%; min-height: 130px; margin: 8px 0 12px;
+      padding: 14px; border: 1px solid #bbcadd; border-radius: 12px;
+      resize: vertical; font: inherit;
+    }
+    #status { color: #586b80; font-size: 14px; min-height: 25px; }
+    #caseLabel { font-size: 13px; color: #586b80; }
+    footer { margin-top: 24px; color: #68798b; font-size: 13px; }
+  </style>
+</head>
+<body>
+<main>
+  <div class="label">LOGISTICS OPERATIONS · AI DEMO</div>
+  <h1>Clearance Follow-up Assistant</h1>
+  <p class="intro">
+    Turn broker updates into a clear summary, missing-information
+    checklist, and follow-up email draft.
+  </p>
+
+  <div class="notice">
+    Use fictional data only. This assistant analyzes supplied messages.
+    It does not query customs systems or independently verify release.
+  </div>
+
+  <div class="toolbar">
+    <span id="caseLabel"></span>
+    <div>
+      <button class="secondary" id="example" type="button">Try example</button>
+      <button class="secondary" id="newCase" type="button">New case</button>
+    </div>
+  </div>
+
+  <section id="messages" aria-label="Conversation" aria-live="polite"></section>
+
+  <form id="chatForm">
+    <label for="input">Paste a broker update or ask a follow-up question</label>
+    <textarea id="input" maxlength="6000" required
+      placeholder="Include a fictional shipment reference, destination country, and broker message. You can write in English or Chinese."></textarea>
+    <button id="send" type="submit">Analyze update</button>
+    <p id="status" role="status"></p>
+  </form>
+
+  <footer>
+    Conversation is retained on this browser and sent to the server for
+    case continuity. New case starts a separate record; it does not
+    delete older server records. AI suggestions require human review.
+  </footer>
+</main>
+
+<script>
+  const storageKey = "clearance-demo-v1";
+  const messages = document.getElementById("messages");
+  const input = document.getElementById("input");
+  const status = document.getElementById("status");
+  const send = document.getElementById("send");
+  const newCase = document.getElementById("newCase");
+  const example = document.getElementById("example");
+  let busy = false;
+
+  function freshCase() {
+    return { id: crypto.randomUUID(), messages: [] };
+  }
+
+  function loadCase() {
+    try {
+      const value = JSON.parse(localStorage.getItem(storageKey));
+      if (
+        value &&
+        typeof value.id === "string" &&
+        /^[a-f0-9-]{36}$/.test(value.id) &&
+        Array.isArray(value.messages)
+      ) {
+        value.messages = value.messages.filter(item =>
+          item &&
+          ["user", "assistant"].includes(item.role) &&
+          typeof item.content === "string"
+        );
+        return value;
+      }
+    } catch {}
+    return freshCase();
+  }
+
+  let current = loadCase();
+
+  function save() {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(current));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function render() {
+    messages.replaceChildren();
+    document.getElementById("caseLabel").textContent =
+      "Case " + current.id.slice(0, 8);
+
+    if (!current.messages.length) {
+      const welcome = document.createElement("p");
+      welcome.textContent =
+        "Start with a broker message. I will separate confirmed information from assumptions and suggest the next follow-up.";
+      messages.append(welcome);
+    }
+
+    for (const item of current.messages) {
+      const bubble = document.createElement("div");
+      bubble.className = "message " + item.role;
+      const speaker = document.createElement("strong");
+      speaker.className = "speaker";
+      speaker.textContent = item.role === "user" ? "You" : "Assistant";
+      bubble.append(speaker, document.createTextNode(item.content));
+      messages.append(bubble);
+    }
+  }
+
+  function setBusy(value) {
+    busy = value;
+    send.disabled = value;
+    newCase.disabled = value;
+    example.disabled = value;
+    input.disabled = value;
+  }
+
+  example.addEventListener("click", () => {
+    input.value =
+      'Shipment DEMO-001 contains network equipment destined for Canada. The broker wrote: "We have received your documents and are processing the entry." Has the entry been submitted? What should I follow up on?';
+    input.focus();
+  });
+
+  newCase.addEventListener("click", () => {
+    if (busy) return;
+    current = freshCase();
+    save();
+    input.value = "";
+    status.textContent = "New case started.";
+    render();
+  });
+
+  document.getElementById("chatForm").addEventListener("submit", async event => {
+    event.preventDefault();
+    const text = input.value.trim();
+    if (!text || busy) return;
+
+    setBusy(true);
+    status.textContent = "Analyzing the supplied information…";
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caseId: current.id, message: text })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Request failed.");
+      if (typeof data.reply !== "string") {
+        throw new Error("Unexpected response. Please try again.");
+      }
+
+      current.messages.push(
+        { role: "user", content: text },
+        { role: "assistant", content: data.reply }
+      );
+
+      const saved = save();
+      render();
+      input.value = "";
+      status.textContent = saved
+        ? "Reply received. You can add another update to this case."
+        : "Reply received, but this browser could not save a local copy.";
+    } catch (error) {
+      status.textContent = error.message || "Connection failed. Please try again.";
+    } finally {
+      setBusy(false);
+      input.focus();
+    }
+  });
+
+  render();
+</script>
+</body>
+</html>
