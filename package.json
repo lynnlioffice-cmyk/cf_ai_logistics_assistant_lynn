@@ -1,0 +1,14 @@
+{
+  "name": "cf-ai-logistics-assistant-lynn",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-powered hardware shipment clearance follow-up assistant",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
