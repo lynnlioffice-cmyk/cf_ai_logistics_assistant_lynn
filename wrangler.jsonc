@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "cf-ai-logistics-assistant-lynn",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-13",
+  "ai": {
+    "binding": "AI"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CLEARANCE_CASES",
+        "class_name": "ClearanceCase"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ClearanceCase"]
+    }
+  ]
+}
